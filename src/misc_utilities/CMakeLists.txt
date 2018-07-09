@@ -60,7 +60,17 @@ TARGET_LINK_LIBRARIES(openalpr-utils-calibrate
 	${Tesseract_LIBRARIES}
   )
 
+ADD_EXECUTABLE( openalpr-utils-batch-warp batch_warp.cpp  )
+TARGET_LINK_LIBRARIES(openalpr-utils-batch-warp
+    ${OPENALPR_LIB}
+    support
+    ${OpenCV_LIBS} 
+	${Tesseract_LIBRARIES}
+  )
+
   
+install (TARGETS openalpr-utils-batch-warp DESTINATION bin)
+
 install (TARGETS openalpr-utils-calibrate DESTINATION bin)
 
 

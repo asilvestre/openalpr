@@ -27,11 +27,14 @@
 #include "support/filesystem.h"
 #include "../tclap/CmdLine.h"
 #include "prewarp.h"
+#include "alpr.h"
+#include "support/filesystem.h"
 
 #include <sstream>
 
 using namespace std;
 using namespace cv;
+using namespace alpr;
 
 const int INSTRUCTIONS_HEIGHT = 32;
 
@@ -254,6 +257,8 @@ int main(int argc, char** argv) {
   string config_path;
   string translate_config;
   string image_output_file;
+  string inDir;
+  bool showImages;
   
   int max_width;
   int max_height;
@@ -263,6 +268,7 @@ int main(int argc, char** argv) {
   TCLAP::UnlabeledValueArg<std::string>  fileArg( "image_file", "Image containing license plates", true, "", "image_file_path"  );
 
   TCLAP::ValueArg<std::string> countryCodeArg("c","country","Country code to identify (either us for USA or eu for Europe).  Default=us",false, "us" ,"country_code");
+  TCLAP::ValueArg<std::string>  inDirArg( "", "in_dir", "Directory with images to test", false, "./", "in_dir"  );
   
   TCLAP::ValueArg<std::string> configFileArg("","config","Path to the openalpr.conf file",false, "" ,"config_file");
   
@@ -271,16 +277,19 @@ int main(int argc, char** argv) {
   
   TCLAP::ValueArg<int> maxWidthArg("w", "maxwidth", "Max Width used for displaying image in this utility.  Default=1280",false, 1280 ,"max width");
   TCLAP::ValueArg<int> maxHeightArg("", "maxheight", "Max Height used for displaying image in this utility.  Default=1024",false, 1024 ,"max height");
+  TCLAP::SwitchArg showImagesArg("", "show_images", "Show images in detection run", true);
   
   try
   {
     cmd.add( configFileArg );
     cmd.add( fileArg );
+    cmd.add( inDirArg );
     cmd.add( countryCodeArg );
     cmd.add( translateTestArg );
     cmd.add( imageOutputArg );
     cmd.add( maxWidthArg );
     cmd.add( maxHeightArg );
+    cmd.add( showImagesArg );
 
     
     if (cmd.parse( argc, argv ) == false)
@@ -291,11 +300,13 @@ int main(int argc, char** argv) {
 
     filename = fileArg.getValue();
     country = countryCodeArg.getValue();
+    inDir = inDirArg.getValue();
     config_path = configFileArg.getValue();
     translate_config = translateTestArg.getValue();
     image_output_file = imageOutputArg.getValue();
     max_width = maxWidthArg.getValue();
     max_height = maxHeightArg.getValue();
+    showImages = showImagesArg.getValue();
 
   }
   catch (TCLAP::ArgException &e)    // catch any exceptions
@@ -309,7 +320,7 @@ int main(int argc, char** argv) {
     cerr << "Could not find image file: " << filename << endl;
   }
   
-  config = alpr::Config(country);
+  config = alpr::Config(country, config_path);
   
   panning = false;
   left_clicking = false;
@@ -389,7 +400,7 @@ int main(int argc, char** argv) {
   }
   
   create_window();
-  
+
   drawImage(imgOriginal);
 
   while (cvGetWindowHandle(WINDOW_NAME.c_str()) != 0)
@@ -399,17 +410,100 @@ int main(int argc, char** argv) {
 
     if (c == 'o')
     {
-      cout << "prewarp = " << get_config() << endl;
+      cerr << "prewarp = " << get_config() << endl;
     } else if (c == 'q')
     {
-      cout << "prewarp = " << get_config() << endl;
+      cerr << "prewarp = " << get_config() << endl;
       break;
+    }
+    else if (c == 'r')
+    {
+      alpr::Alpr openalpr(country, config_path);
+      openalpr.setPrewarp(get_config());
+      PreWarp prewarp(&config);
+      prewarp.initialize(get_config());
+
+      cerr << "Start image detection round, loaded " << openalpr.isLoaded() << endl;
+
+      const std::string& f = filename;
+      string fullpath = f;
+
+      cerr << "Detecting image " << f << endl;
+      alpr::AlprResults results = openalpr.recognize(fullpath);
+
+      for (int i = 0; i < results.plates.size(); i++)
+      {
+        alpr::AlprPlateResult plate = results.plates[i];
+        std::cerr << "plate" << i << ": " << plate.topNPlates.size() << " results" << std::endl;
+
+        for (int k = 0; k < plate.topNPlates.size(); k++)
+        {
+          alpr::AlprPlate candidate = plate.topNPlates[k];
+          std::cerr << "    - " << candidate.characters << "\t confidence: " << candidate.overall_confidence;
+          std::cerr << "\t pattern_match: " << candidate.matches_template << std::endl;
+        }
+      }
+    }
+    else if (c == 'x')
+    {
+      alpr::Alpr openalpr(country, config_path);
+      openalpr.setPrewarp(get_config());
+      PreWarp prewarp(&config);
+      prewarp.initialize(get_config());
+
+      cerr << "Start image detection round, loaded " << openalpr.isLoaded() << endl;
+
+      float score = 0;
+      vector<string> files = getFilesInDir(inDir.c_str(), true);
+      int max_shown = 15;
+      int interval_show = std::max(1LU, files.size() / max_shown);
+      int interval_count = 0;
+      for (vector<string>::const_iterator iter = files.begin(); iter != files.end(); ++iter)
+      {
+        const std::string& f = *iter;
+        if (hasEnding(f, ".png") || hasEnding(f, ".jpg") || hasEnding(f, ".jpeg"))
+        {
+          string fullpath = inDir + "/" + f;
+
+          cerr << "Detecting image " << f << endl;
+          interval_count += 1;
+          if (showImages && interval_count >= interval_show)
+          {
+            interval_count = 0;
+            Mat frame = imread( fullpath.c_str() );
+            Mat warpFrame = prewarp.warpImage(frame);
+
+            imshow(f.c_str(), warpFrame);
+          }
+
+          alpr::AlprResults results = openalpr.recognize(fullpath);
+
+          for (int i = 0; i < results.plates.size(); i++)
+          {
+            alpr::AlprPlateResult plate = results.plates[i];
+            std::cerr << "plate" << i << ": " << plate.topNPlates.size() << " results" << std::endl;
+
+            if (!plate.topNPlates.empty())
+            {
+              score += plate.topNPlates[0].overall_confidence;
+            }
+            for (int k = 0; k < plate.topNPlates.size(); k++)
+            {
+              alpr::AlprPlate candidate = plate.topNPlates[k];
+              std::cerr << "    - " << candidate.characters << "\t confidence: " << candidate.overall_confidence;
+              std::cerr << "\t pattern_match: " << candidate.matches_template << std::endl;
+            }
+          }
+        }
+      }
+
+      float max_score = files.size() * 100;
+      cerr << "Image detection run done, score: " << 100 * score / max_score << "(" << score << " / " << max_score << ")"  << endl;
     }
 
   }
 
   cvDestroyAllWindows();
-  
   
   return 0;
 }

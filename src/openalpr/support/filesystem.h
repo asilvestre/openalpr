@@ -37,7 +37,7 @@ namespace alpr
 
   bool DirectoryExists( const char* pzPath );
   bool fileExists( const char* pzPath );
-  std::vector<std::string> getFilesInDir(const char* dirPath);
+  std::vector<std::string> getFilesInDir(const char* dirPath, bool recursive=false);
 
   bool stringCompare( const std::string &left, const std::string &right );
 

@@ -77,7 +77,7 @@ namespace alpr
     return fExists;
   }
 
-  std::vector<std::string> getFilesInDir(const char* dirPath)
+  std::vector<std::string> getFilesInDir(const char* dirPath, bool recursive)
   {
     DIR *dir;
 
@@ -90,7 +90,21 @@ namespace alpr
       while ((ent = readdir (dir)) != NULL)
       {
         if (strcmp(ent->d_name, ".") != 0 && strcmp(ent->d_name, "..") != 0)
-          files.push_back(ent->d_name);
+        {
+          std::string subdir = dirPath + std::string("/") + std::string(ent->d_name);
+          if (DirectoryExists(subdir.c_str()) && recursive)
+          {
+            std::vector<std::string> dirFiles = getFilesInDir(subdir.c_str(), recursive);
+            for (std::vector<std::string>::const_iterator iter = dirFiles.begin(); iter != dirFiles.end(); ++iter)
+            {
+              files.push_back(ent->d_name + std::string("/") + *iter);
+            }
+          }
+          else
+          { 
+            files.push_back(ent->d_name);
+          }
+        }
       }
       closedir (dir);
     }
