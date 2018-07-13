@@ -49,7 +49,6 @@ namespace alpr
     float totalscore;
     bool matchesTemplate;
     std::vector<Letter> letter_details;
-    std::vector<int> unknowns;
   };
 
   bool letterCompare( const Letter &left, const Letter &right );

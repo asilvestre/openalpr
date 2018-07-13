@@ -269,7 +269,7 @@ int main( int argc, const char** argv )
                       pipeline_data.thresholds[t].rows);
 
                   Mat cropped = pipeline_data.thresholds[t](char_region);
-                  filename << outDir << "/" << humanInputs[c] << "-" << t << "-" << files[i];
+                  filename << outDir << "/" << humanInputs[c] << "-" << t << "_" << c << "-" << files[i];
                   imwrite(filename.str(), cropped);
                   cout << "Writing char image: " << filename.str() << " region " << char_region << endl;
                 }
@@ -305,36 +305,16 @@ int main( int argc, const char** argv )
                 }
               }
               const PPResult& bestRes = res[bestIdx];
-              const std::vector<int>& unks = bestRes.unknowns;
-              const std::string& letters = bestRes.letters;
-              int unkIdx = 0;
-              printf("UNKS ");
-              for (int k = 0; k < unks.size(); k  += 1)
-              {
-                printf(" %d ", unks[k]);
-              }
-              printf("\n");
+              const std::vector<Letter>& letters = bestRes.letter_details;
 
-              for (int j = 0; j < humanInputs.size(); j += 1)
+              for (int j = 0; j < letters.size(); j += 1)
               {
                 const Letter& letter = bestRes.letter_details[j];
 
-                bool isUnk = unkIdx < unks.size() && j == unks[unkIdx];
-                bool isOver = j - unkIdx >= 0 && j - unkIdx >= letters.size();
-                if (isOver)
+                if (letter.charposition < humanInputs.size())
                 {
-                  humanInputs[j] = SPACE;
+                  humanInputs[letter.charposition] = letter.letter;
                 }
-                else if (isUnk)
-                {
-                  unkIdx += 1;
-                  humanInputs[j] = SPACE;
-                }
-                else
-                {
-                  humanInputs[j] = letters[j - unkIdx];
-                }
-                printf("CHAR %c UNK %d\n", j - unkIdx < letters.size() ? letters[j-unkIdx] : ' ', unkIdx - 1 >= 0 ? unks[unkIdx - 1] : -1);
               }
 
               for (int c = 0; c < pipeline_data.charRegionsFlat.size(); c++)
@@ -355,7 +335,7 @@ int main( int argc, const char** argv )
                       pipeline_data.thresholds[t].rows);
 
                   Mat cropped = pipeline_data.thresholds[t](char_region);
-                  filename << outDir << "/" << humanInputs[c] << "-" << t << "-" << files[i];
+                  filename << outDir << "/" << humanInputs[c] << "-" << t << "_" << c << "-" << files[i];
                   imwrite(filename.str(), cropped);
                   cout << "Writing char image: " << filename.str() << " region " << char_region << endl;
                 }

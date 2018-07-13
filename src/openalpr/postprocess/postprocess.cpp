@@ -89,7 +89,6 @@ namespace alpr
 
     insertLetter(letter, line_index, charposition, score);
 
-      printf("%p %s %d\n", this, letter.c_str(), charposition);
     if (score < skip_level)
     {
       float adjustedScore = abs(skip_level - score) + min_confidence;
@@ -373,10 +372,6 @@ namespace alpr
         possibility.letters = possibility.letters + letter.letter;
         possibility.letter_details.push_back(letter);
         plate_char_length += 1;
-      }
-      else
-      {
-        possibility.unknowns.push_back(letter.charposition);
       }
       possibility.totalscore = possibility.totalscore + letter.totalscore;
     }
